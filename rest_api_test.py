@@ -1,12 +1,20 @@
+#################################################
+# Updated test: https://tinyurl.com/y8xwbt5v    #
+# Contact: yonigoel@gmail.com                   #
+#                                               #
+#################################################
+
 import os
 import sys
-import pdb
-from datetime import datetime
+import re
+import pip
+import csv
 import urllib.request
 import urllib3.util
 import base64
 import pytest
 import json
+#import selenium
 
 
 # Test global viarables
@@ -69,17 +77,34 @@ class RestApi:
     def url(self):
         del self._url
 
-    
-def install_modules():
-    """
-    If modules not installed in your VM
-    """
-    os.system('''wget https://bootstrap.pypa.io/get-pip.py''')
-    os.system('''export PATH="$PWD/.local/bin:$PATH"''')
-    os.system('''python get-pip.py''')
-    os.system('''sudo easy_install pip''')
-    os.system('''pip install pytest==2.9.1''')
 
+
+def save_to_csv(data_list, file_name, header=None):
+    """
+    Save the data sets using the file name
+    @param::data_set - dict() to save into file
+    @param::file_name - of the save data
+    """
+    if len(data_list)==0:
+        return
+
+    try:
+        skip = 0
+        with open(file_name, 'w') as csvfile:
+            writer = csv.writer(csvfile , lineterminator='\n')
+            for tup in data_list:
+                try:
+                    if header is not None:
+                        writer.writerow(header)
+                        header=None
+
+                    writer.writerow(tup)
+                except AttributeError:
+                    skip +=1
+                    continue
+    except IOError:
+        print("I/O error")
+  
 
 def run_web_server(url='https://drive.google.com/u/0/uc?id=1V4pn_Ydu6Pzudju0tFMXqKoR0gzQyeqg&export=download', file_name='twtask'):
     """
@@ -93,11 +118,32 @@ def run_web_server(url='https://drive.google.com/u/0/uc?id=1V4pn_Ydu6Pzudju0tFMX
     os.spawnl(os.P_NOWAIT, *command)
 
 
+@pytest.mark.server
+def test_web_server():
+    assert os.path.isfile('twtask')==True, 'Linux executable does not exist'
+
+
 #py.test -m pymodules
 @pytest.mark.pymodules
 def test_py_modules():
-    # TODO: implement function
-    print ('')
+    """
+    If modules not installed in your VM
+    """
+    modules = ['re','urllib','base64', 'pytest', 'json', 'selenium', 'csv']
+    missing = []
+    for mod in modules:
+        if mod not in sys.modules:
+            missing.append(mod)
+            #pip.main(['install', mod])
+    
+    assert len(missing) == 0, 'Missing modules: {}'.format(missing)
+    """
+    if 'pip' in missing:
+        os.system('''wget https://bootstrap.pypa.io/get-pip.py''')
+        os.system('''export PATH="$PWD/.local/bin:$PATH"''')
+        os.system('''python get-pip.py''')
+        os.system('''sudo easy_install pip''')
+    """
 
 
 #py.test -m pyversion
@@ -108,8 +154,8 @@ def test_py_version():
 
 def request(P):
     """
-    @param::http - Object
-    @param::url - desired url 
+    @param::P - RestApi object
+    Function will send request to desired HTTP and return data & status_code 
     """
     try:
         headers = urllib3.make_headers(basic_auth='{}:{}'.format(P.user_name,P.password))
@@ -119,8 +165,10 @@ def request(P):
         
         with open('{}/page_{}.json'.format(JSON_OUTPUT,P.page), 'w') as d:
             d.write(json.dumps(data_list))
+           
         print (P.url)
         return (data_list, response.status)
+    
     except Exception: # SSL error, timeout, host is down, firewall block, etc.
         return (data_list, response.status)
 
@@ -130,7 +178,8 @@ def add_uniq_pairs(player, page):
     @param::player - name and ID
     Function will add a player to uniq_pairs only if doesn't exist
     """
-    uniq_pairs['{}/{}'.format(player['Name'],player['ID'])]= page
+    if uniq_pairs.get("%s/%s" % (player['Name'],player['ID'])) is None:
+        uniq_pairs["%s/%s" % (player['Name'],player['ID'])] = page
 
 
 
@@ -140,88 +189,133 @@ def add_total_pairs(player, page):
     Function will add a player to full_pairs list with page number
     Format:: {name: [[page, ID1], [page, ID2]......[page, IDn]]}
     """
-    if total_pairs.get(player['Name']) is None:
-        total_pairs[player['Name']] = list()
-        total_pairs[player['Name']].append((page,player['ID']))
+    values=player['Name']
+    _id=player['ID']
+
+    if total_pairs.get(values) is None:
+        total_pairs[values] = list()
+        total_pairs[values].append((page,_id))
         return
     
-    total_pairs[player['Name']].append((page,player['ID']))
+    if len(total_pairs.get(values)) == 1:
+        if total_pairs.get(values)[0][1]!=_id:
+            total_pairs[values].append((page,_id))
+        return
+    
+    for item in total_pairs.get(values):
+        if item[1]==_id:
+            return
 
-
+    total_pairs[values].append((page,_id))
+            
+    
 def dump_database_to_structure(data, page):
     for player in data:
         add_uniq_pairs(player, page)
         add_total_pairs(player, page)
 
 
+@pytest.mark.illegal_name
 def test_illegal_name():
     """
     @param::player - name and ID
-    Function return true if: 
+    Test will fail if at leat one name is illegal
     """
-    defected_name = []
-    lst = total_pairs.get("")
-    lst += total_pairs.get('null')
-    if len(lst) > 1:
-        for i in total_pairs.get(""):
-            defected_name.append('{}/{}'.format(i[0], i[1]))
+    suspect = list()
+    for key in uniq_pairs:
+        player = key.split('/')
+        if player[0] == '' or player[0] == 'null':
+            suspect.append((player[0],player[1],uniq_pairs[key] ))
 
-    assert len(defected_name) < 1, 'Test fail, {} illegal names in page/id: {}'.format(len(defected_name),defected_name)
+    file_name='illegal_names.csv'
+    save_to_csv(suspect,file_name, ('Illegal name', 'id', 'page'))
+    assert len(suspect) == 0, 'Test fail! found {} illegal names, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
 
 
+@pytest.mark.illegal_id
 def test_illegal_id():
     """
     @param::player - name and ID
-    Function return true if: 
     """
-    defected_id = []
-    for key in total_pairs:
-        if len(total_pairs[key])==1:
-            if total_pairs[key][0][1] == '':
-                defected_id.append('{}/{}'.format(total_pairs[key][0][0], key))
-        else:
-            for pair in total_pairs[key]:
-                if pair[1] == '':
-                    defected_id.append('{}/{}'.format(pair[0], key))
+    #uniq_pairs["test/"] = 1
+    suspect=list()
+    sus = list(filter(lambda x: not x.split('/')[1].isdigit(), uniq_pairs))
+    if sus:
+        for key in uniq_pairs:
+            player = key.split('/')
+            if player[0]+'/' in sus:
+                suspect.append((player[0],player[1], uniq_pairs[key]))
+    
+    file_name='illegal_IDs.csv'  
+    save_to_csv(suspect,file_name, ('name', 'illegal id', 'page'))  
+    assert len(suspect) == 0, 'Test fail, found {} empty IDs, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
 
-    assert len(defected_id) < 1, 'Test fail, empty ID in page/name: {}'.format(defected_name)
 
-
-def test_one_2_one_name(player):
+@pytest.mark.one_2_one_name
+def test_one_2_one_name():
     """
     @param::player - name and ID
-    Function return true if: 
+    Test will fail if at least 1 Name is assotiated with more that one ID 
     """
-    if uniq_pairs.get(player['Name']): 
-        if player['ID'] != uniq_pairs[player['Name']]:
-            return True
+    names=list(map(lambda x: x.split('/')[0], uniq_pairs))
+    names = list(filter(('').__ne__, names))
+    names = list(filter(('null').__ne__, names))
 
-    else:
-        uniq_pairs[player['Name']]=player['ID']
-    
-    return False
+    suspect=list()
+    if len(names)!=len(set(names)):
+        sus=set([x for x in names if names.count(x) > 1])
+        if sus:
+            for name in sus:
+                for page, _id in total_pairs.get(name):
+                    suspect.append((name, _id, page))
+        
+        file_name='one_2_one_names.csv'
+        save_to_csv(suspect,file_name, ('name', 'illegal id', 'page')) 
+        assert len(suspect) == 0, 'Test fail, found {} one_2_one_names, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
 
 
-def test_one_2_one_id(player):
+@pytest.mark.one_2_one_id
+def test_one_2_one_id():
     """
     @param::player - name and ID
-    Function return true if: 
+    Test will fail if at least 1 ID is assotiated with more that one name 
     """
-    
-    if player['ID'] != uniq_pairs[player['Name']]:
-        return True
+    suspect=list()
+    names=list(map(lambda x: x.split('/')[1], uniq_pairs))
+    names = list(filter(('').__ne__, names))
+    if len(names)!=len(set(names)):
+        sus=set([x for x in names if names.count(x) > 1])
+        
+        if sus:
+            for _id in sus:
+                for key in uniq_pairs:
+                    if int(_id) == int(key.split('/')[1]):
+                        suspect.append((key.split('/')[0],key.split('/')[1], uniq_pairs[key]))
 
-    else:
-        uniq_pairs[player['Name']]=player['ID']
-    
-    return False
+        file_name='one_2_one_ids.csv'
+        save_to_csv(suspect,file_name, ('name', 'illegal id', 'page'))
+        assert len(suspect) == 0, 'Test fail, found {} one_2_one_ids, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
+        
+
+def pytest_sessionfinish(session, exitstatus):
+    """
+    Called after whole test run finished, right before
+    returning the exit status to the system.
+    """
+    with open('total_pairs', 'w') as d:
+        for key in sorted(total_pairs):
+            d.write('{}: {}\n'.format(key, set(total_pairs[key])))
+
+    with open('uniq_pairs', 'w') as d:
+        for key in uniq_pairs:
+            d.write('{}: {}\n'.format(key, uniq_pairs[key]))
 
 
 
-def main():
+def pull_data():
+    print ('enter pull_data')
     status, no_page_change, prev_uniq_len, uniq_len = 200, 0, 0, -1
     Players=RestApi()
-    
     # pull until we get teapot client error
     os.mkdir(JSON_OUTPUT)
     while status !=418 and no_page_change < 100:
@@ -234,18 +328,18 @@ def main():
         prev_uniq_len = uniq_len
         Players.page += 1
 
-    try:
-        test_illegal_id()
-        test_illegal_name()
-        
-    except Exception as e:
-        print (e)
-    
 
-    print ('Checked {} pages'.format(Players.page))
-    print ('Found {} uniq pairs'.format(len(uniq_pairs)))
-    print ('Found {} total pairs'.format(len(total_pairs)))
+@pytest.fixture(scope="session", autouse=True)
+def main():
+    copy=1
+    path = os.path.join(os.getcwd(), TEST_OUTPUT)
+    while os.path.isdir(path+str(copy)): copy+=1
+    path+=str(copy)
+    os.mkdir(path)
+    os.chdir(path)
+    pull_data()
 
+"""
     with open('total_pairs', 'w') as d:
         for key in sorted(total_pairs):
             d.write('{}: {}\n'.format(key, set(total_pairs[key])))
@@ -253,17 +347,4 @@ def main():
     with open('uniq_pairs', 'w') as d:
         for key in uniq_pairs:
             d.write('{}: {}\n'.format(key, uniq_pairs[key]))
-
-
-if __name__ == '__main__':
-    test_py_version()
-    run_web_server()
-    #start_time = datetime.now()
-    copy=1
-    path = os.path.join(os.getcwd(), TEST_OUTPUT)
-    while os.path.isdir(path+str(copy)): copy+=1
-    path+=str(copy)
-    os.mkdir(path)
-    os.chdir(path)
-    main()
-    #print('Execution time: ' + str(datetime.now() - start_time) + 'ms')
+"""
