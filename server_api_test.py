@@ -338,13 +338,3 @@ def main():
     os.mkdir(path)
     os.chdir(path)
     pull_data()
-
-"""
-    with open('total_pairs', 'w') as d:
-        for key in sorted(total_pairs):
-            d.write('{}: {}\n'.format(key, set(total_pairs[key])))
-
-    with open('uniq_pairs', 'w') as d:
-        for key in uniq_pairs:
-            d.write('{}: {}\n'.format(key, uniq_pairs[key]))
-"""
