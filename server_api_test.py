@@ -347,21 +347,4 @@ def main():
     with open('uniq_pairs', 'w') as d:
         for key in uniq_pairs:
             d.write('{}: {}\n'.format(key, uniq_pairs[key]))
-<<<<<<< HEAD:rest_api_test.py
 """
-=======
-
-
-if __name__ == '__main__':
-    test_py_version()
-    run_web_server()
-    #start_time = datetime.now()
-    copy=1
-    path = os.path.join(os.getcwd(), TEST_OUTPUT)
-    while os.path.isdir(path+str(copy)): copy+=1
-    path+=str(copy)
-    os.mkdir(path)
-    os.chdir(path)
-    main()
-    #print('Execution time: ' + str(datetime.now() - start_time) + 'ms')
->>>>>>> 4857d0d6287271887ff6fc776a29b1bf1e213618:server_api_test.py
