@@ -20,6 +20,7 @@ import json
 # Test global viarables
 total_pairs = dict()
 uniq_pairs = dict()
+errors=0
 
 # Test Parameters
 TEST_OUTPUT='playerApi_files'
@@ -59,11 +60,9 @@ class RestApi:
             block=True
         )
     
-
     @property
     def url(self):
         return self._url
-
 
     @url.setter
     def url(self, page):
@@ -72,11 +71,9 @@ class RestApi:
         else:
             self._url = ('{}?page={}'.format(self.url_base, page))
      
-
     @url.deleter
     def url(self):
         del self._url
-
 
 
 def save_to_csv(data_list, file_name, header=None):
@@ -85,9 +82,10 @@ def save_to_csv(data_list, file_name, header=None):
     @param::data_set - dict() to save into file
     @param::file_name - of the save data
     """
+    global errors
     if len(data_list)==0:
         return
-
+    errors+=1
     try:
         skip = 0
         with open(file_name, 'w') as csvfile:
@@ -118,40 +116,6 @@ def run_web_server(url='https://drive.google.com/u/0/uc?id=1V4pn_Ydu6Pzudju0tFMX
     os.spawnl(os.P_NOWAIT, *command)
 
 
-@pytest.mark.server
-def test_web_server():
-    assert os.path.isfile('twtask')==True, 'Linux executable does not exist'
-
-
-#py.test -m pymodules
-@pytest.mark.pymodules
-def test_py_modules():
-    """
-    If modules not installed in your VM
-    """
-    modules = ['re','urllib','base64', 'pytest', 'json', 'selenium', 'csv']
-    missing = []
-    for mod in modules:
-        if mod not in sys.modules:
-            missing.append(mod)
-            #pip.main(['install', mod])
-    
-    assert len(missing) == 0, 'Missing modules: {}'.format(missing)
-    """
-    if 'pip' in missing:
-        os.system('''wget https://bootstrap.pypa.io/get-pip.py''')
-        os.system('''export PATH="$PWD/.local/bin:$PATH"''')
-        os.system('''python get-pip.py''')
-        os.system('''sudo easy_install pip''')
-    """
-
-
-#py.test -m pyversion
-@pytest.mark.pyversion
-def test_py_version():
-    assert float('.'.join(map(str,sys.version_info[:2]))) > 3.6, 'python version is too old: {}'.format(sys.version_info[:2])
-
-
 def request(P):
     """
     @param::P - RestApi object
@@ -180,7 +144,6 @@ def add_uniq_pairs(player, page):
     """
     if uniq_pairs.get("%s/%s" % (player['Name'],player['ID'])) is None:
         uniq_pairs["%s/%s" % (player['Name'],player['ID'])] = page
-
 
 
 def add_total_pairs(player, page):
@@ -215,8 +178,66 @@ def dump_database_to_structure(data, page):
         add_total_pairs(player, page)
 
 
+def backup_data():
+    """
+    Write dictionaries to text files
+    """
+    with open('total_pairs', 'w') as d:
+        for key in sorted(total_pairs):
+            d.write('{}: {}\n'.format(key, set(total_pairs[key])))
+
+    with open('uniq_pairs', 'w') as d:
+        for key in uniq_pairs:
+            d.write('{}: {}\n'.format(key, uniq_pairs[key]))
+
+
+@pytest.mark.server
+def test_web_server(_test=True):
+    if not _test:
+        if os.path.isfile('twtask')==False:
+            print ('Linux exe not found, triggering run_web_server()')
+            run_web_server()
+            return
+    else:
+        assert os.path.isfile('twtask')==True, 'Linux executable does not exist'
+    
+
+@pytest.mark.pymodules
+def test_py_modules(_test=True):
+    """
+    If modules not installed in your VM
+    """
+    if not _test:
+        try:
+            import os
+            import sys
+            import pip
+        except ImportError:
+            os.system('''wget https://bootstrap.pypa.io/get-pip.py''')
+            os.system('''export PATH="$PWD/.local/bin:$PATH"''')
+            os.system('''python get-pip.py''')
+            os.system('''sudo easy_install pip''')
+
+        
+    modules = ['re','urllib','base64', 'pytest', 'json', 'csv']
+    missing = []
+    for mod in modules:
+        if mod not in sys.modules:
+            missing.append(mod)
+            if not _test:
+                pip.main(['install', mod])
+    
+
+    assert not _test or len(missing) == 0, 'Missing modules: {}'.format(missing)
+
+
+@pytest.mark.pyversion
+def test_py_version(_test=True):
+    assert not _test or float('.'.join(map(str,sys.version_info[:2]))) > 3.6, 'python version is too old: {}'.format(sys.version_info[:2])
+
+
 @pytest.mark.illegal_name
-def test_illegal_name():
+def test_illegal_name(_test=True):
     """
     @param::player - name and ID
     Test will fail if at leat one name is illegal
@@ -229,11 +250,11 @@ def test_illegal_name():
 
     file_name='illegal_names.csv'
     save_to_csv(suspect,file_name, ('Illegal name', 'id', 'page'))
-    assert len(suspect) == 0, 'Test fail! found {} illegal names, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
+    assert not _test or len(suspect) == 0, 'Test fail! found {} illegal names, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
 
 
 @pytest.mark.illegal_id
-def test_illegal_id():
+def test_illegal_id(_test=True):
     """
     @param::player - name and ID
     """
@@ -248,11 +269,11 @@ def test_illegal_id():
     
     file_name='illegal_IDs.csv'  
     save_to_csv(suspect,file_name, ('name', 'illegal id', 'page'))  
-    assert len(suspect) == 0, 'Test fail, found {} empty IDs, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
+    assert not _test or len(suspect) == 0, 'Test fail, found {} empty IDs, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
 
 
 @pytest.mark.one_2_one_name
-def test_one_2_one_name():
+def test_one_2_one_name(_test=True):
     """
     @param::player - name and ID
     Test will fail if at least 1 Name is assotiated with more that one ID 
@@ -271,11 +292,11 @@ def test_one_2_one_name():
         
         file_name='one_2_one_names.csv'
         save_to_csv(suspect,file_name, ('name', 'illegal id', 'page')) 
-        assert len(suspect) == 0, 'Test fail, found {} one_2_one_names, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
+        assert not _test or len(suspect) == 0, 'Test fail, found {} one_2_one_names, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
 
 
 @pytest.mark.one_2_one_id
-def test_one_2_one_id():
+def test_one_2_one_id(_test=True):
     """
     @param::player - name and ID
     Test will fail if at least 1 ID is assotiated with more that one name 
@@ -294,47 +315,52 @@ def test_one_2_one_id():
 
         file_name='one_2_one_ids.csv'
         save_to_csv(suspect,file_name, ('name', 'illegal id', 'page'))
-        assert len(suspect) == 0, 'Test fail, found {} one_2_one_ids, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
+        assert not _test or len(suspect) == 0, 'Test fail, found {} one_2_one_ids, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
         
 
-def pytest_sessionfinish(session, exitstatus):
-    """
-    Called after whole test run finished, right before
-    returning the exit status to the system.
-    """
-    with open('total_pairs', 'w') as d:
-        for key in sorted(total_pairs):
-            d.write('{}: {}\n'.format(key, set(total_pairs[key])))
-
-    with open('uniq_pairs', 'w') as d:
-        for key in uniq_pairs:
-            d.write('{}: {}\n'.format(key, uniq_pairs[key]))
-
-
-
-def pull_data():
-    print ('enter pull_data')
-    status, no_page_change, prev_uniq_len, uniq_len = 200, 0, 0, -1
+def pull_server_data():
+    teapot_error, status, no_new_pairs, prev_uniq_len, uniq_len = 418, 200, 0, 0, -1
     Players=RestApi()
-    # pull until we get teapot client error
     os.mkdir(JSON_OUTPUT)
-    while status !=418 and no_page_change < 100:
+    
+    while status!=teapot_error and no_new_pairs < 100:
         Players.url = Players.page
         data, status = request(Players)
         uniq_len = prev_uniq_len
-        if uniq_len==prev_uniq_len: no_page_change+=1
-        else: no_page_change=0&no_page_change
+        if uniq_len==prev_uniq_len: no_new_pairs+=1
+        else: no_new_pairs=0&no_new_pairs
         dump_database_to_structure(data, Players.page)
         prev_uniq_len = uniq_len
         Players.page += 1
+
+
+def test_db_api():
+    """
+    run all test scenarios if not running in mark mode
+    """
+    _test=False
+    test_illegal_name(_test)
+    test_illegal_id(_test)
+    test_one_2_one_name(_test)
+    test_one_2_one_id(_test)
 
 
 @pytest.fixture(scope="session", autouse=True)
 def main():
     copy=1
     path = os.path.join(os.getcwd(), TEST_OUTPUT)
-    while os.path.isdir(path+str(copy)): copy+=1
+    while os.path.isdir("%s%s" % (path,copy)): copy+=1
     path+=str(copy)
     os.mkdir(path)
     os.chdir(path)
-    pull_data()
+    pull_server_data()
+    test_db_api()
+    backup_data()
+    print ('Found {} error types, test path: {}'.format(errors, path))
+
+
+if __name__ == '__main__':
+    test_py_version()
+    test_py_modules(False)
+    test_web_server()
+    main()
