@@ -10,16 +10,23 @@ import re
 import pip
 import csv
 import urllib.request
-import urllib3.util
-import base64
-import pytest
-import json
-#import selenium
+try:
+    import urllib3.util
+    import base64
+    import pytest
+    import json
+    import subprocess
 
+except ModuleNotFoundError:
+    pip.main(['install', 'pytest'])
+    pip.main(['install', 'urllib3'])
+    pip.main(['install', 'subprocess.run'])
 
+    
 # Test global viarables
 total_pairs = dict()
 uniq_pairs = dict()
+parent=os.getcwd()
 errors=0
 
 # Test Parameters
@@ -112,8 +119,8 @@ def run_web_server(url='https://drive.google.com/u/0/uc?id=1V4pn_Ydu6Pzudju0tFMX
         os.system("wget -O {} {}".format(file_name,url))
     
     os.system("chmod 755 {}".format(file_name))
-    command='./{}'.format(file_name)
-    os.spawnl(os.P_NOWAIT, *command)
+    command='./{} &'.format(file_name)
+    subprocess.call(command, shell=True)
 
 
 def request(P):
@@ -193,13 +200,7 @@ def backup_data():
 
 @pytest.mark.server
 def test_web_server(_test=True):
-    if not _test:
-        if os.path.isfile('twtask')==False:
-            print ('Linux exe not found, triggering run_web_server()')
-            run_web_server()
-            return
-    else:
-        assert os.path.isfile('twtask')==True, 'Linux executable does not exist'
+    assert os.path.isfile(os.path.join(parent, 'twtask'))==True, 'Linux executable does not exist'
     
 
 @pytest.mark.pymodules
@@ -207,26 +208,11 @@ def test_py_modules(_test=True):
     """
     If modules not installed in your VM
     """
-    if not _test:
-        try:
-            import os
-            import sys
-            import pip
-        except ImportError:
-            os.system('''wget https://bootstrap.pypa.io/get-pip.py''')
-            os.system('''export PATH="$PWD/.local/bin:$PATH"''')
-            os.system('''python get-pip.py''')
-            os.system('''sudo easy_install pip''')
-
-        
-    modules = ['re','urllib','base64', 'pytest', 'json', 'csv']
+    modules = ['re','urllib','base64', 'pytest', 'json', 'csv','urllib3.util','subprocess']
     missing = []
     for mod in modules:
         if mod not in sys.modules:
             missing.append(mod)
-            if not _test:
-                pip.main(['install', mod])
-    
 
     assert not _test or len(missing) == 0, 'Missing modules: {}'.format(missing)
 
@@ -347,20 +333,18 @@ def test_db_api():
 
 @pytest.fixture(scope="session", autouse=True)
 def main():
+    run_web_server()
     copy=1
-    path = os.path.join(os.getcwd(), TEST_OUTPUT)
+    path = os.path.join(parent, TEST_OUTPUT)
     while os.path.isdir("%s%s" % (path,copy)): copy+=1
     path+=str(copy)
     os.mkdir(path)
     os.chdir(path)
     pull_server_data()
-    test_db_api()
+    #test_db_api()
     backup_data()
     print ('Found {} error types, test path: {}'.format(errors, path))
 
 
 if __name__ == '__main__':
-    test_py_version()
-    test_py_modules(False)
-    test_web_server()
     main()
