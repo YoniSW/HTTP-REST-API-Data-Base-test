@@ -10,6 +10,7 @@ import re
 import pip
 import csv
 import urllib.request
+from functools import reduce
 try:
     import urllib3.util
     import base64
@@ -225,7 +226,6 @@ def test_py_version(_test=True):
 @pytest.mark.illegal_name
 def test_illegal_name(_test=True):
     """
-    @param::player - name and ID
     Test will fail if at leat one name is illegal
     """
     suspect = list()
@@ -242,7 +242,7 @@ def test_illegal_name(_test=True):
 @pytest.mark.illegal_id
 def test_illegal_id(_test=True):
     """
-    @param::player - name and ID
+    Test will fail if at least one id is illegal
     """
     #uniq_pairs["test/"] = 1
     suspect=list()
@@ -261,7 +261,6 @@ def test_illegal_id(_test=True):
 @pytest.mark.one_2_one_name
 def test_one_2_one_name(_test=True):
     """
-    @param::player - name and ID
     Test will fail if at least 1 Name is assotiated with more that one ID 
     """
     names=list(map(lambda x: x.split('/')[0], uniq_pairs))
@@ -284,7 +283,6 @@ def test_one_2_one_name(_test=True):
 @pytest.mark.one_2_one_id
 def test_one_2_one_id(_test=True):
     """
-    @param::player - name and ID
     Test will fail if at least 1 ID is assotiated with more that one name 
     """
     suspect=list()
@@ -302,6 +300,31 @@ def test_one_2_one_id(_test=True):
         file_name='one_2_one_ids.csv'
         save_to_csv(suspect,file_name, ('name', 'illegal id', 'page'))
         assert not _test or len(suspect) == 0, 'Test fail, found {} one_2_one_ids, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
+
+
+@pytest.mark.unfollowing_id
+def test_following_id(_test=True):
+    """
+    Test will fail if at least 1 ID is not a following number to a previous ID number
+    """
+    suspect=list()
+    id_nums=list(map(lambda x: int(x.split('/')[1]), uniq_pairs))
+    id_nums.sort()
+    _id = id_nums[0] 
+    for n in set(id_nums):
+        if _id!=n:
+            suspect.append(_id)
+            _id+=1
+        _id+=1
+    
+    file_name='unfollowing_ids.csv'
+    if len(suspect) > 0:
+        a=open(file_name, 'w')
+        a.write('Missing IDs:\n')
+        for num in suspect:
+            a.write("%s%s" % (num,'\n'))
+
+    assert not _test or len(suspect) == 0, 'Test fail, found {} unfollowing_ids, saved to: {}'.format(len(suspect),os.path.join(os.getcwd(),file_name))
         
 
 def pull_server_data():
@@ -343,7 +366,6 @@ def main():
     pull_server_data()
     backup_data()
     print ('Found {} error types, test path: {}'.format(errors, path))
-
 
 if __name__ == '__main__':
     main()
