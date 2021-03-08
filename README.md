@@ -12,7 +12,3 @@ For more details and bug list: see **test_report.xlsx**
 - pytest.ini - pytest framwork configs.
 - Dockerfile - file to build image for testing via docker.
 - test_report.xlsx - file with testcases, reproduce and buglist
-
-docker build . -t yoni_app:test
-
-docker run -it --rm yoni_app:test
