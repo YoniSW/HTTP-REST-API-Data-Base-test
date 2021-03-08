@@ -14,4 +14,5 @@ For more details and bug list: see **test_report.xlsx**
 - test_report.xlsx - file with testcases, reproduce and buglist
 
 docker build . -t yoni_app:test
+
 docker run -it --rm yoni_app:test
