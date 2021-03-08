@@ -341,7 +341,6 @@ def main():
     os.mkdir(path)
     os.chdir(path)
     pull_server_data()
-    #test_db_api()
     backup_data()
     print ('Found {} error types, test path: {}'.format(errors, path))
 
